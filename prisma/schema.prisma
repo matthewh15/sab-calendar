@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+  clinician    ClinicianProfile?
+}
+
+enum Role {
+  ADMIN
+  CLINICIAN
+}
+
+model ClinicianProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id])
+  slug               String   @unique
+  fullName           String
+  headshotUrl        String?
+  bio                String?
+  credentials        String?
+  specialties        String[]
+  timezone           String
+  defaultVideoLink   String?
+  googleRefreshToken String?
+  googleCalendarId   String?
+  isActive           Boolean  @default(true)
+  eventType          EventType?
+  availability       AvailabilityRule[]
+  bookings           Booking[]
+}
+
+model EventType {
+  id          String  @id @default(cuid())
+  clinicianId String  @unique
+  clinician   ClinicianProfile @relation(fields: [clinicianId], references: [id])
+  name        String  @default("Service Animal Evaluations (ESA/PSD)")
+  duration    Int     @default(30) // minutes
+  buffer      Int     @default(0)
+}
+
+enum AvailabilityKind {
+  WEEKLY
+  EXCEPTION
+}
+
+model AvailabilityRule {
+  id          String            @id @default(cuid())
+  clinicianId String
+  clinician   ClinicianProfile  @relation(fields: [clinicianId], references: [id])
+  kind        AvailabilityKind
+  weekday     Int? // 0=Sun..6=Sat for WEEKLY
+  startTime   String? // "09:00"
+  endTime     String? // "17:00"
+  date        DateTime? // for EXCEPTION
+  windowsJson Json?
+}
+
+enum BookingStatus { BOOKED CANCELED COMPLETED }
+
+enum Language { en es }
+
+model Booking {
+  id               String         @id @default(cuid())
+  clinicianId      String
+  clinician        ClinicianProfile @relation(fields: [clinicianId], references: [id])
+  startsAtUTC      DateTime
+  endsAtUTC        DateTime
+  clientName       String
+  email            String
+  phone            String?
+  state            String?
+  animalType       String?
+  language         Language        @default(en)
+  status           BookingStatus   @default(BOOKED)
+  paymentStatus    String          @default("PAID")
+  stripePaymentIntentId String?
+  googleEventId    String?
+  meetingLink      String?
+  icsUid           String?
+  createdAt        DateTime        @default(now())
+}
+
+model PaymentAccessToken {
+  id          String   @id @default(cuid())
+  clientEmail String
+  token       String   @unique
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  clinicianId String?
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  metaJson    Json?
+  createdAt   DateTime @default(now())
+}
